@@ -11,7 +11,7 @@ from torch.utils.data.sampler import SubsetRandomSampler
 
 
 class MindBigData(Dataset):
-    """MindBigData dataset."""
+    """MindBigDataデータセット"""
     def __init__(self, inputs, labels, transform=None):
         """
         Args:
@@ -37,7 +37,7 @@ class MindBigData(Dataset):
 
 
 class EEGImagesDataset(Dataset):
-    """EEG Images Dataset from EEG."""
+    """EEG画像データセット"""
     def __init__(self, annotations_file, img_dir, transform=None, target_transform=None):
         self.img_labels = pd.read_csv(annotations_file)
         self.img_dir = img_dir
@@ -60,7 +60,7 @@ class EEGImagesDataset(Dataset):
         return image, label
 
 
-def GetDataSet(input_file, num_samples=-1, samples_per_digit=2000):
+def GetDataSet_original(input_file, num_samples=-1, samples_per_digit=2000):
     """
     Read data from MindBigData - The Visual "MNIST" of Brain Digits (2021)
     for more details refer: https://www.mindbigdata.com/opendb/visualmnist.html
@@ -141,6 +141,70 @@ def GetDataSet(input_file, num_samples=-1, samples_per_digit=2000):
 
     return np.array(x), np.array(y).astype(np.int), labels_hist
 
+def GetDataSet(input_file, num_samples=-1, samples_per_digit=2000):
+    """
+    Read data from MindBigData - The Visual "MNIST" of Brain Digits (2021)
+    for more details refer: https://www.mindbigdata.com/opendb/visualmnist.html
+    :param input_file: input file to read data from
+    :param num_samples: number of samples(lines) to read from the file
+    :param samples_per_digit: number of samples per digit
+    :return: x, y, labels_hist
+    """
+    x = []
+    y = []
+    labels_hist = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    cnt = 0
+    num_channels = 14
+    channels_cnt = 0
+    all_channels = []
+    
+    with open(input_file) as data:
+        csv_reader = csv.reader(data, delimiter='\t')
+
+        for row in csv_reader:
+            if (num_samples == -1):
+                pass
+            elif(cnt == num_samples):
+                break
+
+            cnt += 1
+
+            id = row[0]  # a numeric, only for reference purposes.
+
+            event = row[1]  # an integer, used to distinguish the same event captured at different brain locations
+
+            device = row[2]  # 2 character string, to identify the device used to capture the signals
+
+            channel = row[3]  # a string, to identify the 10/20 brain location of the signal,
+            # with possible values: "AF3,"AF4","T7","T8","PZ"
+
+            code = int(row[4])  # the digit been thought/seen, with possible values 0,1,2,3,4,5,6,7,8,9 or -1
+            if (code == -1):
+                continue
+
+            size = int(row[5])  # size = number of values captured in the 2 seconds of this signal
+            if (size < 256):
+                continue
+
+            data = (row[6]).split(',')  # a comma-separated set of numbers, with the time-series amplitude of the signal
+            data = np.array(data, dtype=np.float32)
+            data = data[0:256]
+
+            # define a number of samples per digit
+            if (labels_hist[code] >= samples_per_digit):
+                continue
+
+            all_channels.append(data)
+            channels_cnt += 1
+            
+            if (channels_cnt == num_channels):
+                x.append(np.array(all_channels))
+                y.append(code)
+                labels_hist[code] += 1
+                all_channels = []
+                channels_cnt = 0
+
+    return np.array(x), np.array(y).astype(np.int), labels_hist
 
 def GetDataAndPreProcess(input_file, num_samples=-1, samples_per_digit=5000):
     """
@@ -155,9 +219,12 @@ def GetDataAndPreProcess(input_file, num_samples=-1, samples_per_digit=5000):
     print(labels_hist)
 
     # Pre-Process data
-    x = PreProcess(x)
+    x_preprocessed = PreProcess(x)
 
-    return x, y
+    x_standardized = Standardize(x_preprocessed)
+
+
+    return x, x_preprocessed, x_standardized, y
 
 
 def GetDataLoaders(x, y, batch_size=64):
@@ -298,7 +365,7 @@ def GetDataLoadersEEGImages(input_file, num_samples=-1, batch_size=64, gen=True,
     return train_loader, valid_loader, test_loader
 
 
-def PreProcess(x):
+def PreProcess_original(x):
     """
     Apply pre-processing to EEG signals such as filtering and noise reduction
     :param x
@@ -323,5 +390,73 @@ def PreProcess(x):
 
         # trim 32 samples from the beginning of the signal
         x_trimmed[i] = x_new[i][:, 32:256]
+        
 
     return x_trimmed
+
+import numpy as np
+
+def Standardize(x):
+    """
+    Standardize and apply min-max scaling to a 3D array (trial, channel, data points).    
+    Returns:
+    Standardized and min-max scaled array of the same shape.
+    """
+    # Create a copy of the input array to store the standardized data
+    x_standardized = np.copy(x)
+    
+    # Iterate over each trial and channel
+    for trial in range(x.shape[0]):
+        for channel in range(x.shape[1]):
+            data_points = x[trial, channel, :]
+            
+            # Standardization: z-score (mean = 0, std = 1)
+            mean = np.mean(data_points)
+            std = np.std(data_points)
+            if std != 0:
+                standardized_data = (data_points - mean) / std
+            else:
+                standardized_data = data_points
+            
+            # Min-Max Scaling: Scale to range [0, 1]
+            min_val = np.min(standardized_data)
+            max_val = np.max(standardized_data)
+            if max_val - min_val != 0:
+                min_max_scaled_data = (standardized_data - min_val) / (max_val - min_val)
+            else:
+                min_max_scaled_data = standardized_data
+            
+            x_standardized[trial, channel, :] = min_max_scaled_data
+
+    return x_standardized
+
+def PreProcess(x):
+    """
+    Apply pre-processing to EEG signals such as filtering (Butterworth and notch) and trim 32 samples.
+    
+    :param x: 3D array of EEG signals (trials, channels, data points)
+    :return: x_new: 3D array of pre-processed signals (trials, channels, 224 data points)
+    """
+    fs = 128.0
+    x_new = np.zeros((x.shape[0], x.shape[1], 224), dtype=np.float32)
+
+    # Design Butterworth bandpass filter
+    b_butter, a_butter = signal.butter(N=6, Wn=[0.5, 63], btype='bandpass', fs=fs)
+    # Design notch filter to remove 50Hz powerline noise
+    b_notch, a_notch = signal.iirnotch(w0=50, Q=30, fs=fs)
+
+    for trial in range(x.shape[0]):
+        for channel in range(x.shape[1]):
+            # Extract the signal for current trial and channel
+            signal_data = x[trial, channel, :]
+            
+            # Apply Butterworth bandpass filter
+            filtered_signal = signal.filtfilt(b_butter, a_butter, signal_data)
+            
+            # Apply Notch filter to remove 50Hz noise
+            filtered_signal = signal.filtfilt(b_notch, a_notch, filtered_signal)
+
+            # Trim the first 32 samples
+            x_new[trial, channel, :] = filtered_signal[32:256]
+    
+    return x_new
