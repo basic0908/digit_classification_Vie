@@ -1,4 +1,4 @@
-# digit_classification_Vie
+# EEG-based classification of imagined digits using low-density EEG
 Digit classification using low-density EEG
 
 ![framework](https://github.com/user-attachments/assets/67ebcabd-4574-4d10-aeb4-e97151581142)
