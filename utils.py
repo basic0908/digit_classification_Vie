@@ -2,6 +2,7 @@ import os
 import numpy as np
 import csv
 import cv2
+import pywt
 from torch.utils.data import Dataset, DataLoader
 from scipy import signal
 import pandas as pd
@@ -206,27 +207,6 @@ def GetDataSet(input_file, num_samples=-1, samples_per_digit=2000):
 
     return np.array(x), np.array(y).astype(np.int), labels_hist
 
-def GetDataAndPreProcess(input_file, num_samples=-1, samples_per_digit=5000):
-    """
-    get data set and perform pre-processing
-    :param input_file: input file to read data from
-    :param num_samples: number of samples(lines) to read from the file
-    :param samples_per_digit: number of samples per digit
-    :return: x, y
-    """
-    # Read train and test datasets from file
-    x, y, labels_hist = GetDataSet(input_file=input_file, num_samples=num_samples, samples_per_digit=samples_per_digit)
-    print(labels_hist)
-
-    # Pre-Process data
-    x_preprocessed = PreProcess(x)
-
-    x_standardized = Standardize(x_preprocessed)
-
-
-    return x, x_preprocessed, x_standardized, y
-
-
 def GetDataLoaders(x, y, batch_size=64):
     """
     get data loaders
@@ -394,7 +374,6 @@ def PreProcess_original(x):
 
     return x_trimmed
 
-import numpy as np
 
 def Standardize(x):
     """
@@ -441,9 +420,9 @@ def PreProcess(x):
     x_new = np.zeros((x.shape[0], x.shape[1], 224), dtype=np.float32)
 
     # Design Butterworth bandpass filter
-    b_butter, a_butter = signal.butter(N=6, Wn=[0.5, 63], btype='bandpass', fs=fs)
+    b_butter, a_butter = signal.butter(N=5, Wn=0.1, btype='highpass', fs=fs)
     # Design notch filter to remove 50Hz powerline noise
-    b_notch, a_notch = signal.iirnotch(w0=50, Q=30, fs=fs)
+    b_notch, a_notch = signal.iirnotch(w0=60, Q=30, fs=fs)
 
     for trial in range(x.shape[0]):
         for channel in range(x.shape[1]):
@@ -460,3 +439,71 @@ def PreProcess(x):
             x_new[trial, channel, :] = filtered_signal[32:256]
     
     return x_new
+
+
+def wavelet_decomposition(x, wavelet='db4', level=2):
+    """
+    Perform wavelet decomposition on the preprocessed EEG signal.
+    
+    Parameters:
+    - eeg_data: numpy array of the EEG signal
+    - wavelet: the wavelet to use (default is 'db4' - Daubechies-4)
+    - level: levels of decomposition
+    
+    Returns:
+    - DWT coefficients (AC, DC) at each level
+    """
+    coeffs = pywt.wavedec(x, wavelet, level=level)
+    AC = coeffs[0]  # Approximation coefficients
+    DC_levels = coeffs[1:]  # Detail coefficients for each level
+    
+    return AC, DC_levels
+
+def apply_thresholding(coeffs, threshold=0.1):
+    """
+    Apply thresholding to wavelet coefficients to remove noise.
+    
+    Parameters:
+    - coeffs: list of wavelet coefficients (both approximation and detail coefficients)
+    - threshold: value below which coefficients are set to zero
+    
+    Returns:
+    - Thresholded coefficients
+    """
+    thresholded_coeffs = []
+    for c in coeffs:
+        thresholded_coeffs.append(pywt.threshold(c, threshold, mode='soft'))
+    return thresholded_coeffs
+
+def GetDataAndPreProcess(input_file, num_samples=-1, samples_per_digit=5000):
+    """
+    get data set and perform pre-processing
+    :param input_file: input file to read data from
+    :param num_samples: number of samples(lines) to read from the file
+    :param samples_per_digit: number of samples per digit
+    :return: x, y
+    """
+    # Read train and test datasets from file
+    x, y, labels_hist = GetDataSet(input_file=input_file, num_samples=num_samples, samples_per_digit=samples_per_digit)
+    print(labels_hist)
+
+    # 1 - Pre-Process data (High-pass + Notch filtering)
+    x_preprocessed = PreProcess(x) 
+
+    # 2 - Apply DWT (Wavelet decomposition)
+    AC, DC_levels = wavelet_decomposition(x_preprocessed, wavelet='db4', level=2)
+    
+    # 3 - Apply thresholding for denoising
+    AC_thresh = apply_thresholding([AC], threshold=0.1)[0]
+    DC_levels_thresh = apply_thresholding(DC_levels, threshold=0.1)
+    
+    # Combine AC and DC coefficients
+    all_coeffs = np.concatenate([AC_thresh] + DC_levels_thresh)
+    
+
+    # 4 - standardize
+    x_standardized = Standardize(all_coeffs)
+
+
+    return x, x_preprocessed, x_standardized, y
+
