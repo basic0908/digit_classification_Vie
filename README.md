@@ -11,3 +11,6 @@ Feature classification : multiple version sof multilayer bidirectional recurrent
 ### Results 
 ![results](https://github.com/user-attachments/assets/4e9681a4-3567-4a79-81b3-cc0d7d1e24e6)
 
+
+### Data preprocess
+![raw](plot/raw_plot.png)
