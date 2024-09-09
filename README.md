@@ -13,5 +13,6 @@ Feature classification : multiple version sof multilayer bidirectional recurrent
 
 
 ### Data preprocess
+Raw -> preprocess(filters) -> reconstruction(wavelet transformation) -> standardization
 ![raw](plot/3_plot.png)
 
