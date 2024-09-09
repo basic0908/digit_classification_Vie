@@ -13,4 +13,5 @@ Feature classification : multiple version sof multilayer bidirectional recurrent
 
 
 ### Data preprocess
-![raw](plot/raw_plot.png)
+![raw](plot/3_plot.png)
+
