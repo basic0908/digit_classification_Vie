@@ -435,8 +435,8 @@ def PreProcess(x):
             # Apply Notch filter to remove 50Hz noise
             filtered_signal = signal.filtfilt(b_notch, a_notch, filtered_signal)
 
-            # Trim the first 32 samples
-            x_new[trial, channel, :] = filtered_signal[32:256]
+            # # Trim the first 32 samples
+            # x_new[trial, channel, :] = filtered_signal[32:256]
     
     return x_new
 
