@@ -441,7 +441,7 @@ def PreProcess(x):
     return x_new
 
 
-def wavelet_decomposition(x, wavelet='db4', level=2):
+def wavelet_transformation(x, wavelet='db4', level=2, threshold=0.1):
     """
     Perform wavelet decomposition on the preprocessed EEG signal.
     
@@ -453,27 +453,15 @@ def wavelet_decomposition(x, wavelet='db4', level=2):
     Returns:
     - DWT coefficients (AC, DC) at each level
     """
-    coeffs = pywt.wavedec(x, wavelet, level=level)
-    AC = coeffs[0]  # Approximation coefficients
-    DC_levels = coeffs[1:]  # Detail coefficients for each level
-    
-    return AC, DC_levels
+    # Decomposition up to level 2
+    coeffs = pywt.wavedec(x, wavelet, level)
 
-def apply_thresholding(coeffs, threshold=0.1):
-    """
-    Apply thresholding to wavelet coefficients to remove noise.
+    # Noise elimination and reconstruction
+    coeffs[1:] = [pywt.threshold(c, threshold, mode='soft') for c in coeffs[1:]]
+    reconstructed_x = pywt.waverec(coeffs, wavelet)
     
-    Parameters:
-    - coeffs: list of wavelet coefficients (both approximation and detail coefficients)
-    - threshold: value below which coefficients are set to zero
-    
-    Returns:
-    - Thresholded coefficients
-    """
-    thresholded_coeffs = []
-    for c in coeffs:
-        thresholded_coeffs.append(pywt.threshold(c, threshold, mode='soft'))
-    return thresholded_coeffs
+    return reconstructed_x
+
 
 def GetDataAndPreProcess(input_file, num_samples=-1, samples_per_digit=5000):
     """
@@ -484,26 +472,18 @@ def GetDataAndPreProcess(input_file, num_samples=-1, samples_per_digit=5000):
     :return: x, y
     """
     # Read train and test datasets from file
-    x, y, labels_hist = GetDataSet(input_file=input_file, num_samples=num_samples, samples_per_digit=samples_per_digit)
+    x_raw, y, labels_hist = GetDataSet(input_file=input_file, num_samples=num_samples, samples_per_digit=samples_per_digit)
     print(labels_hist)
 
     # 1 - Pre-Process data (High-pass + Notch filtering)
-    x_preprocessed = PreProcess(x) 
+    x_preprocessed = PreProcess(x_raw) 
 
     # 2 - Apply DWT (Wavelet decomposition)
-    AC, DC_levels = wavelet_decomposition(x_preprocessed, wavelet='db4', level=2)
-    
-    # 3 - Apply thresholding for denoising
-    AC_thresh = apply_thresholding([AC], threshold=0.1)[0]
-    DC_levels_thresh = apply_thresholding(DC_levels, threshold=0.1)
-    
-    # Combine AC and DC coefficients
-    all_coeffs = np.concatenate([AC_thresh] + DC_levels_thresh)
-    
+    x_reconstructed = wavelet_transformation(x_preprocessed, wavelet='db4', level=2)
 
-    # 4 - standardize
-    x_standardized = Standardize(all_coeffs)
+    # 3 - standardize
+    x_standardized = Standardize(x_reconstructed)
 
 
-    return x, x_preprocessed, x_standardized, y
+    return x_raw, x_preprocessed, x_reconstructed, x_standardized, y
 
