@@ -1,7 +1,6 @@
-import tensorflow as tf
-from tensorflow.python.keras.layers import Input, Bidirectional, LSTM, Dense, Flatten
-from tensorflow.python.keras.models import Model
-from tensorflow.python.keras.optimizers import Adam
+from keras.layers import Input, Bidirectional, LSTM, Dense, Flatten
+from keras.models import Model
+from keras.optimizers import Adam
 
 class MultilayerBidirectionalRNN:
     def __init__(self, input_shape=(14, 256), num_classes=10, learning_rate=0.001):
