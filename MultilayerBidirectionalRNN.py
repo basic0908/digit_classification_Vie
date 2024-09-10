@@ -1,6 +1,7 @@
 from keras.layers import Input, Bidirectional, LSTM, Dense, Flatten
 from keras.models import Model
 from keras.optimizers import Adam
+from keras.callbacks import ModelCheckpoint
 
 class MultilayerBidirectionalRNN:
     def __init__(self, input_shape=(14, 256), num_classes=10, learning_rate=0.001):
@@ -47,7 +48,7 @@ class MultilayerBidirectionalRNN:
         """
         return self.model.summary()
 
-    def train(self, x_train, y_train, batch_size=1024, epochs=10, validation_data=None):
+    def train(self, x_train, y_train, batch_size=1024, epochs=10, validation_data=None, checkpoint_path="best_model.h5"):
         """
         Trains the model on the provided training data.
         
@@ -61,10 +62,23 @@ class MultilayerBidirectionalRNN:
         Returns:
         - History of the training process.
         """
+        # Create a callback that saves the model's best weights
+        checkpoint = ModelCheckpoint(filepath=checkpoint_path,
+                                                        monitor='val_loss',  # Monitors the validation loss
+                                                        save_best_only=True,  # Saves only the best model
+                                                        mode='min',  # Indicates that lower is better for val_loss
+                                                        verbose=1)
+        
+        # List of callbacks
+        callbacks = [checkpoint]
+        
+        # Training the model
         history = self.model.fit(x_train, y_train, 
-                                 batch_size=batch_size, 
-                                 epochs=epochs, 
-                                 validation_data=validation_data)
+                                batch_size=batch_size, 
+                                epochs=epochs, 
+                                validation_data=validation_data,
+                                callbacks=callbacks)
+        
         return history
 
     def evaluate(self, x_test, y_test):
