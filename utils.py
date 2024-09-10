@@ -477,12 +477,14 @@ def GetDataAndPreProcess(input_file, num_samples=-1, samples_per_digit=5000):
 
     # 1 - Pre-Process data (High-pass + Notch filtering)
     x_preprocessed = PreProcess(x_raw) 
+    print("PreProcess - complete")
 
     # 2 - Apply DWT (Wavelet decomposition)
     x_reconstructed = wavelet_transformation(x_preprocessed, wavelet='db4', level=2)
+    print("Wavelet transformation - complete")
 
     # 3 - standardize
     x_standardized = Standardize(x_reconstructed)
-
+    print("Standardization - complete")
 
     return x_raw, x_preprocessed, x_reconstructed, x_standardized, y

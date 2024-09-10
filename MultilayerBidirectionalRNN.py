@@ -37,7 +37,7 @@ class MultilayerBidirectionalRNN:
 
         # Compile the model
         model.compile(optimizer=Adam(learning_rate=self.learning_rate),
-                      loss='categorical_crossentropy',
+                      loss='sparse_categorical_crossentropy',
                       metrics=['accuracy'])
 
         return model
