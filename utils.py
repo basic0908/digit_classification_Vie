@@ -414,10 +414,10 @@ def PreProcess(x):
     Apply pre-processing to EEG signals such as filtering (Butterworth and notch) and trim 32 samples.
     
     :param x: 3D array of EEG signals (trials, channels, data points)
-    :return: x_new: 3D array of pre-processed signals (trials, channels, 224 data points)
+    :return: x_new: 3D array of pre-processed signals (trials, channels, 256 data points)
     """
     fs = 128.0
-    x_new = np.zeros((x.shape[0], x.shape[1], 224), dtype=np.float32)
+    x_new = np.zeros((x.shape[0], x.shape[1], 256), dtype=np.float32)
 
     # Design Butterworth bandpass filter
     b_butter, a_butter = signal.butter(N=5, Wn=0.1, btype='highpass', fs=fs)

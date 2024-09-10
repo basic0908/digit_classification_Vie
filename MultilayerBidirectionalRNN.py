@@ -48,16 +48,15 @@ class MultilayerBidirectionalRNN:
         """
         return self.model.summary()
 
-    def train(self, x_train, y_train, batch_size=1024, epochs=10, validation_data=None, checkpoint_path="best_model.h5"):
+    def train(self, train_loader, batch_size=1024, epochs=10, validation_loader=None, checkpoint_path="best_model.keras"):
         """
         Trains the model on the provided training data.
         
         Parameters:
-        - x_train: Training input data.
-        - y_train: Training labels (one-hot encoded).
+        - train_loader: Training data loader.
         - batch_size: Size of the batches used for training.
         - epochs: Number of training epochs.
-        - validation_data: Tuple (x_val, y_val) for validation during training.
+        - validation_loader: Data loader for validation data (optional).
         
         Returns:
         - History of the training process.
@@ -72,8 +71,15 @@ class MultilayerBidirectionalRNN:
         # List of callbacks
         callbacks = [checkpoint]
         
+        # If a validation_loader is provided, convert it to a format Keras can use
+        if validation_loader is not None:
+            x_val, y_val = next(iter(validation_loader))  # Assuming single batch validation, you can modify this to suit your needs
+            validation_data = (x_val, y_val)
+        else:
+            validation_data = None
+
         # Training the model
-        history = self.model.fit(x_train, y_train, 
+        history = self.model.fit(train_loader, 
                                 batch_size=batch_size, 
                                 epochs=epochs, 
                                 validation_data=validation_data,
@@ -81,27 +87,37 @@ class MultilayerBidirectionalRNN:
         
         return history
 
-    def evaluate(self, x_test, y_test):
+    def evaluate(self, test_loader, batch_size=1024):
         """
-        Evaluates the model on the test data.
-        
-        Parameters:
-        - x_test: Test input data.
-        - y_test: Test labels (one-hot encoded).
-        
-        Returns:
-        - Loss and accuracy of the model on the test set.
-        """
-        return self.model.evaluate(x_test, y_test)
+        Evaluates the model on the provided test data.
 
-    def predict(self, x_input):
-        """
-        Generates predictions for the input data.
-        
         Parameters:
-        - x_input: Input data for which predictions are to be made.
-        
+        - test_loader: Data loader for the test data.
+        - batch_size: Size of the batches used for evaluation.
+
         Returns:
-        - Predicted classes.
+        - Evaluation metrics (loss and accuracy, etc.).
         """
-        return self.model.predict(x_input)
+        x_test, y_test = next(iter(test_loader))  # Assuming a single batch of test data
+        # Evaluating the model
+        results = self.model.evaluate(x_test, y_test, batch_size=batch_size, verbose=1)
+
+        return results
+
+
+    def predict(self, data_loader, batch_size=1024):
+        """
+        Generates predictions using the trained model.
+
+        Parameters:
+        - data_loader: Data loader containing the input data.
+        - batch_size: Size of the batches used for predictions.
+
+        Returns:
+        - Model predictions.
+        """
+        x_data = next(iter(data_loader))  # Assuming a single batch of data
+        # Predicting the outputs
+        predictions = self.model.predict(x_data, batch_size=batch_size, verbose=1)
+
+        return predictions
