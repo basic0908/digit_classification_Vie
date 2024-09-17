@@ -218,8 +218,8 @@ def GetDataLoaders(x, y, batch_size=64):
     x_new = np.copy(x)
     y_new = np.copy(y)
 
-    # Split data: 75% train, 25% test
-    x_train, x_test, y_train, y_test = train_test_split(x_new, y_new, test_size=0.25)
+    # Split data: 80% train, 20% test
+    x_train, x_test, y_train, y_test = train_test_split(x_new, y_new, test_size=0.2)
 
     # create DataSet object
     train_data = MindBigData(x_train, y_train)
@@ -229,8 +229,8 @@ def GetDataLoaders(x, y, batch_size=64):
     indices = list(range(len(test_data)))
     np.random.shuffle(indices)
 
-    # get 60% of the test set for validation
-    split = int(np.floor(0.6 * len(test_data)))
+    # get 50% of the test set for validation
+    split = int(np.floor(0.5 * len(test_data)))
     valid_sample = SubsetRandomSampler(indices[:split])
     test_sample = SubsetRandomSampler(indices[split:])
 
@@ -375,11 +375,22 @@ def PreProcess_original(x):
     return x_trimmed
 
 
+import numpy as np
+
 def Standardize(x):
     """
-    Standardize and apply min-max scaling to a 3D array (trial, channel, data points).    
+    Standardize (z-score) and apply min-max scaling to a 3D array (trials, channels, data points).
+    
+    Standardization: (x - mean) / std
+    Min-Max Scaling: Scales the z-scored data to the [0, 1] range.
+    
+    Parameters:
+    x : np.array
+        3D array of shape (trials, channels, data points) representing EEG signals.
+    
     Returns:
-    Standardized and min-max scaled array of the same shape.
+    x_standardized : np.array
+        Standardized and min-max scaled array of the same shape.
     """
     # Create a copy of the input array to store the standardized data
     x_standardized = np.copy(x)
@@ -392,6 +403,8 @@ def Standardize(x):
             # Standardization: z-score (mean = 0, std = 1)
             mean = np.mean(data_points)
             std = np.std(data_points)
+            
+            # Avoid division by zero (std = 0 case)
             if std != 0:
                 standardized_data = (data_points - mean) / std
             else:
@@ -400,14 +413,18 @@ def Standardize(x):
             # Min-Max Scaling: Scale to range [0, 1]
             min_val = np.min(standardized_data)
             max_val = np.max(standardized_data)
+            
+            # Avoid division by zero (min == max case)
             if max_val - min_val != 0:
                 min_max_scaled_data = (standardized_data - min_val) / (max_val - min_val)
             else:
                 min_max_scaled_data = standardized_data
             
+            # Assign the scaled data back to the array
             x_standardized[trial, channel, :] = min_max_scaled_data
 
     return x_standardized
+
 
 def PreProcess(x):
     """
@@ -420,8 +437,8 @@ def PreProcess(x):
     x_new = np.zeros((x.shape[0], x.shape[1], 256), dtype=np.float32)
 
     # Design Butterworth bandpass filter
-    b_butter, a_butter = signal.butter(N=5, Wn=0.1, btype='highpass', fs=fs)
-    # Design notch filter to remove 50Hz powerline noise
+    b_butter, a_butter = signal.butter(N=5, Wn=0.1, btype='high', fs=fs)
+    # Design notch filter to remove 60Hz powerline noise
     b_notch, a_notch = signal.iirnotch(w0=60, Q=30, fs=fs)
 
     for trial in range(x.shape[0]):
@@ -443,22 +460,41 @@ def PreProcess(x):
 
 def wavelet_transformation(x, wavelet='db4', level=2, threshold=0.1):
     """
-    Perform wavelet decomposition on the preprocessed EEG signal.
+    Perform wavelet decomposition and reconstruction on 3D EEG signals.
     
     Parameters:
-    - eeg_data: numpy array of the EEG signal
+    - x: numpy array of shape (trials, channels, microvolts)
     - wavelet: the wavelet to use (default is 'db4' - Daubechies-4)
     - level: levels of decomposition
+    - threshold: the threshold for noise removal
     
     Returns:
-    - DWT coefficients (AC, DC) at each level
+    - reconstructed_x: numpy array of the same shape as x after denoising
     """
-    # Decomposition up to level 2
-    coeffs = pywt.wavedec(x, wavelet, level)
-
-    # Noise elimination and reconstruction
-    coeffs[1:] = [pywt.threshold(c, threshold, mode='soft') for c in coeffs[1:]]
-    reconstructed_x = pywt.waverec(coeffs, wavelet)
+    
+    # Get the shape of the input data
+    trials, channels, _ = x.shape
+    
+    # Create an array to store the reconstructed signals
+    reconstructed_x = np.zeros_like(x)
+    
+    # Loop through each trial and channel
+    for trial in range(trials):
+        for channel in range(channels):
+            # Get the signal for the current trial and channel
+            signal = x[trial, channel, :]
+            
+            # Perform wavelet decomposition up to the specified level
+            coeffs = pywt.wavedec(signal, wavelet, level=level)
+            
+            # Apply soft thresholding to the detail coefficients (skip the approximation)
+            coeffs[1:] = [pywt.threshold(c, threshold, mode='soft') for c in coeffs[1:]]
+            
+            # Reconstruct the signal from the thresholded coefficients
+            reconstructed_signal = pywt.waverec(coeffs, wavelet)
+            
+            # Ensure the reconstructed signal matches the original length
+            reconstructed_x[trial, channel, :] = reconstructed_signal[:x.shape[2]]
     
     return reconstructed_x
 
