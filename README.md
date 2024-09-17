@@ -18,6 +18,14 @@ EEG signals from each trial were recorded for 2 seconds.
 1. Notch filter to remove 60 Hz electrical environment noise.
 1. Discrete wavelet transform(DWT) using the Daubechies-4 wavelet with two-level decomposition on EPOC and the three-level decompostion on MUSE for denoising and informaiton extraction. 
 1. Inverse reconstruction of the original EEG waveform using DWT components
+1. standardized using the Z-score normalization
+
+### Deep Learning Model Architecture
+![model architecture](https://github.com/user-attachments/assets/11afa959-51aa-44b4-be10-1d1c882d4729)
+- multilayer bidrectional-RNN
+- multilayer bidirectional-GRU
+- multilayer bidirectional-LSTM
+
 
 ### Results 
 ![results](https://github.com/user-attachments/assets/4e9681a4-3567-4a79-81b3-cc0d7d1e24e6)
