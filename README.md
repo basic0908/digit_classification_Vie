@@ -9,9 +9,9 @@ EEG signal processing : EEG signals were filtered and preprocessed using the dis
 Feature classification : multiple version sof multilayer bidirectional recurrent neural networks were used
 
 ### EEG data
-EEG signals from each trial were recorded for 2 seconds. 128 Hz sampling rate and 14 channels.
-- EPOC 
-- MUSE
+EEG signals from each trial were recorded for 2 seconds. 
+- EPOC 14 channels 14 channels 128Hz
+- MUSE 4 channels 220 Hz
 
 ### Results 
 ![results](https://github.com/user-attachments/assets/4e9681a4-3567-4a79-81b3-cc0d7d1e24e6)
