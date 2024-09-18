@@ -426,14 +426,13 @@ def Standardize(x):
     return x_standardized
 
 
-def PreProcess(x):
+def PreProcess(x, fs=128):
     """
     Apply pre-processing to EEG signals such as filtering (Butterworth and notch) and trim 32 samples.
     
     :param x: 3D array of EEG signals (trials, channels, data points)
     :return: x_new: 3D array of pre-processed signals (trials, channels, 256 data points)
     """
-    fs = 128.0
     x_new = np.zeros((x.shape[0], x.shape[1], 256), dtype=np.float32)
 
     # Design Butterworth bandpass filter
@@ -453,7 +452,7 @@ def PreProcess(x):
             filtered_signal = signal.filtfilt(b_notch, a_notch, filtered_signal)
 
             # # Trim the first 32 samples
-            # x_new[trial, channel, :] = filtered_signal[32:256]
+            x_new[trial, channel, :] = filtered_signal[:]
     
     return x_new
 
@@ -499,7 +498,7 @@ def wavelet_transformation(x, wavelet='db4', level=2, threshold=0.1):
     return reconstructed_x
 
 
-def GetDataAndPreProcess(input_file, num_samples=-1, samples_per_digit=5000):
+def GetDataAndPreProcess(input_file, num_samples=-1, samples_per_digit=5000, fs=128):
     """
     get data set and perform pre-processing
     :param input_file: input file to read data from
@@ -512,15 +511,15 @@ def GetDataAndPreProcess(input_file, num_samples=-1, samples_per_digit=5000):
     print(labels_hist)
 
     # 1 - Pre-Process data (High-pass + Notch filtering)
-    x_preprocessed = PreProcess(x_raw) 
+    x_preprocessed = PreProcess(x_raw, fs) 
     print("PreProcess - complete")
 
     # 2 - Apply DWT (Wavelet decomposition)
-    x_reconstructed = wavelet_transformation(x_preprocessed, wavelet='db4', level=2)
+    x_transformed = wavelet_transformation(x_preprocessed, wavelet='db4', level=2)
     print("Wavelet transformation - complete")
 
     # 3 - standardize
-    x_standardized = Standardize(x_reconstructed)
+    x_standardized = Standardize(x_transformed)
     print("Standardization - complete")
 
-    return x_raw, x_preprocessed, x_reconstructed, x_standardized, y
+    return x_raw, x_preprocessed, x_transformed, x_standardized, y
